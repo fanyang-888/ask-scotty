@@ -1,0 +1,15 @@
+version = 0.1
+
+[default.global.parameters]
+region = "us-east-1"  # region choice is a design decision: Bedrock availability + Learner Lab default
+
+[default.deploy.parameters]
+stack_name = "ask-scotty-dev"
+resolve_s3 = true
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+# LabRole ARN differs per Learner Lab account — pass at deploy time:
+#   make deploy LAB_ROLE_ARN=arn:aws:iam::<account-id>:role/LabRole
+
+[default.validate.parameters]
+lint = true

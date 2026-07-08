@@ -1,0 +1,104 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Ask Scotty — smallest viable service. One compute path (Lambda behind an
+  HTTP API), one log table, model access behind a config switch.
+  Baseline architecture: add complexity only when you feel the pain.
+
+Parameters:
+  LabRoleArn:
+    Type: String
+    Description: >
+      Execution role ARN. AWS Academy Learner Lab does not permit creating
+      IAM roles, so we pass the pre-provisioned LabRole
+      (arn:aws:iam::<account-id>:role/LabRole).
+  ModelProvider:
+    Type: String
+    Default: stub
+    AllowedValues: [stub, bedrock]
+    Description: Model access path — swap by config, not rewrite.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Tags:
+      Owner: team-ask-scotty
+      Project: ask-scotty
+      Environment: dev
+      CostCenter: 95-731
+
+Resources:
+  AskApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Tags:
+        Owner: team-ask-scotty
+        Project: ask-scotty
+        Environment: dev
+        CostCenter: 95-731
+
+  AskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../api/src
+      Handler: ask_scotty.handler.lambda_handler
+      Role: !Ref LabRoleArn
+      Environment:
+        Variables:
+          MODEL_PROVIDER: !Ref ModelProvider
+          LOG_TABLE: !Ref ExchangeLogTable
+      Events:
+        Ask:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AskApi
+            Path: /ask
+            Method: POST
+
+  # Anonymized exchange log; TTL enforces the IA1 90-day retention line.
+  ExchangeLogTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: exchange_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: exchange_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      Tags:
+        - Key: Owner
+          Value: team-ask-scotty
+        - Key: Project
+          Value: ask-scotty
+        - Key: Environment
+          Value: dev
+        - Key: CostCenter
+          Value: '95-731'
+
+  # Future retrieval layer (RAG over the whitelisted page corpus) — created
+  # now so the bucket name is stable; intentionally unused in TM1.
+  SourceDocsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      Tags:
+        - Key: Owner
+          Value: team-ask-scotty
+        - Key: Project
+          Value: ask-scotty
+        - Key: Environment
+          Value: dev
+        - Key: CostCenter
+          Value: '95-731'
+
+Outputs:
+  AskEndpoint:
+    Description: 'POST a JSON body {"question": "..."} here.'
+    Value: !Sub 'https://${AskApi}.execute-api.${AWS::Region}.amazonaws.com/ask'
+  ExchangeLogTableName:
+    Value: !Ref ExchangeLogTable
