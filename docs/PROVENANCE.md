@@ -1,10 +1,10 @@
 # Code Provenance Log
 
 Every substantive piece of work in this repo gets an entry using the course
-AI Use Modes guide's Minimal Submission Format, plus a review record. Commit
-messages carry matching tags (`[human]` / `[ai-gen]` / `[ai-assisted]` — see
-[CONVENTIONS.md](../CONVENTIONS.md)). Nothing `[ai-gen]` merges without a
-Critic/Red Teamer pass by a teammate who did not prompt it.
+AI Use Modes guide's Minimal Submission Format, plus a review record. Each
+entry names the commits/PR it covers (see [CONVENTIONS.md](../CONVENTIONS.md)).
+No agent-generated change merges without a Critic/Red Teamer pass by a
+teammate who did not prompt it.
 
 ## Summary table
 
