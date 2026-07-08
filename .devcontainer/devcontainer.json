@@ -1,0 +1,22 @@
+{
+  "name": "ask-scotty",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "postCreateCommand": "pipx install aws-sam-cli && make install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "redhat.vscode-yaml",
+        "amazonwebservices.aws-toolkit-vscode"
+      ]
+    }
+  },
+  "remoteEnv": {
+    "MODEL_PROVIDER": "stub",
+    "AWS_DEFAULT_REGION": "us-east-1"
+  }
+}

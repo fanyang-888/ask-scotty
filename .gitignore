@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+
+# AWS SAM build artifacts
+.aws-sam/
+
+# Secrets & local config — never commit credentials (course rule: inject at runtime)
+.env
+.env.*
+*.pem
+.aws/
+
+# OS / editor
+.DS_Store
+.vscode/settings.json
