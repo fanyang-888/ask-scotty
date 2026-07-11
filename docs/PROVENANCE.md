@@ -12,6 +12,7 @@ teammate who did not prompt it.
 |---|---|---|---|---|
 | 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | AI red-team done; ⚠️ teammate sign-off pending |
 | 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | Author-reviewed; ⚠️ teammate sign-off pending |
+| 3 | Crisis-detection hardening, corpus-validated (escalation.py, tests) | Agent-generated, corpus-driven | Operator/Agent + Critic/Red Teamer | Corpus-validated; ⚠️ teammate sign-off pending |
 
 ---
 
@@ -72,6 +73,9 @@ it. Findings:
    response. Same brittleness class as the personal-record bug fixed in Entry 2,
    but higher stakes. Recommend defense-in-depth (broader lexicon + a model-side
    crisis check) before this is anything more than a pilot.
+   **→ FIXED in Entry 3** (pattern-based lexicon, corpus-validated 44/45 caught,
+   0/35 figurative false positives; one genuinely ambiguous phrasing recorded as
+   a residual limit — the model-side second layer remains future work).
 2. **[Privacy] The exchange log stores the raw `question` text.** IA2 itself
    flags query text as sensitive; "anonymized" (no user id) is not "no PII"
    (free text can contain names and situations). The 90-day TTL mitigates but
@@ -164,6 +168,58 @@ accepted: finite noun list (e.g. "my class schedule" is not caught) and a
 30-character match window. **Team project — independent sign-off still
 pending:** this is the author's own review; per CONVENTIONS.md a teammate who
 did not prompt the change should confirm and sign here: ________ (name, date).
+
+---
+
+## Entry 3 — Crisis-detection hardening (fixes Entry 1 finding #1)
+
+**AI Use Mode:** Operator/Agent + Critic/Red Teamer (Claude Opus 4.8) — the
+agent designed, implemented, and corpus-validated the fix for the highest-
+severity finding of the Entry 1 red-team pass.
+
+**Prompt(s):** (translated from Chinese) "Fix it" — referring to Entry 1
+finding #1 (crisis detection keyword-only, verified misses). Method was the
+agent's: two parallel corpus-generation agents produced (a) 45 realistic
+crisis phrasings a distressed student might type (paraphrase, slang,
+indirection, mixed with logistics requests) and (b) 35 benign student
+questions full of figurative death/harm idioms that must NOT trigger a 988
+referral ("this deadline is killing me", "academic suicide", "I shot myself
+in the foot", "I don't want to live in the dorms anymore"). The guard was then
+rewritten from 8 fixed substrings to ~28 compiled patterns and iterated
+against both corpora.
+
+**How I improved or changed the output:** The corpus exposed two defects in
+the agent's own first draft, which were fixed before commit: a lookahead
+missing a word boundary made "can't go on **a**nymore" match the article "a"
+and slip through; and "unalive" needed a suffix wildcard for "unaliving".
+Guards were added for figurative collisions the corpus surfaced ("academic/
+career/social suicide", "kms" as kilometres, "don't want to live **in the
+dorms**").
+
+**What I verified:** Corpus results: **44/45 crisis phrasings caught, 0/35
+benign false positives** (script in session scratchpad; corpora reproduced in
+the test suite's representative cases). End-to-end via `make invoke`: the two
+originally-missed phrasings now return the CaPS/988 response with
+`escalation_flag=true`. Full suite: **24 tests pass** (2 new: crisis
+paraphrases must be caught; figurative death language must not be). NOT
+achievable and recorded honestly: "How do I cancel my housing contract? Not
+that it matters, I don't plan on being here" is indistinguishable by keywords
+from a benign transfer-student question — this is the standing argument for a
+model-side crisis check as a second layer (future work, per Entry 1
+disposition).
+
+**What I contributed:** Fan Yang decided to fix rather than merely document
+the finding, accepted the safety-over-precision bias (a rare jarring referral
+is preferred to a missed crisis), and accepted the residual limit above as a
+documented boundary of keyword-layer detection. *(Teammate: confirm.)*
+
+**Final answer submitted:** escalation.py crisis-pattern rewrite + 2 test
+additions on branch `fy/entry1-critic-review`.
+
+**Critic/Red Teamer review:** Corpus validation above is the AI-side review.
+**Human teammate sign-off pending:** ________ (name, date) — should run
+`make test`, read the pattern list for over/under-match, and confirm the
+residual-limit disposition.
 
 ---
 
