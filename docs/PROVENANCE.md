@@ -10,8 +10,8 @@ teammate who did not prompt it.
 
 | # | Artifact(s) | Origin | AI Use Mode | Review status |
 |---|---|---|---|---|
-| 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | ⚠️ pending team Critic review |
-| 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | ⚠️ pending team Critic review |
+| 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | AI red-team done; ⚠️ teammate sign-off pending |
+| 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | Author-reviewed; ⚠️ teammate sign-off pending |
 
 ---
 
@@ -58,11 +58,53 @@ judgment stays with us.
 **Final answer submitted:** This repository at the commit tagged for TM1
 submission.
 
-**Critic/Red Teamer review:** ⚠️ Pending. Before submission a teammate who
-did not run the agent must: read the diff end-to-end, run `make test` and
-`make invoke` locally, challenge at least the guardrail keyword lists (known
-limitation: keyword matching is crude) and the Bedrock parse-fallback path,
-and sign off here with name + date.
+**Critic/Red Teamer review:**
+
+*AI red-team pass — Claude Opus 4.8, 2026-07-11.* An automated critique read the
+full scaffold (providers, handler, contract, guardrails, system prompt, SAM
+template, tests), ran the suite (22 pass), and probed the safety boundaries.
+This is an **input to** the human Critic review below, **not a substitute** for
+it. Findings:
+
+1. **[Safety — highest] Crisis detection is keyword-only and misses common
+   phrasings.** Verified: "I want to end it all" and "I can't go on anymore" are
+   NOT recognized and fall through to a generic refusal instead of the CaPS/988
+   response. Same brittleness class as the personal-record bug fixed in Entry 2,
+   but higher stakes. Recommend defense-in-depth (broader lexicon + a model-side
+   crisis check) before this is anything more than a pilot.
+2. **[Privacy] The exchange log stores the raw `question` text.** IA2 itself
+   flags query text as sensitive; "anonymized" (no user id) is not "no PII"
+   (free text can contain names and situations). The 90-day TTL mitigates but
+   does not remove this. Recommend documenting it explicitly or scrubbing before
+   the write.
+3. **[Bedrock path] The contract validates structure, not groundedness.** A
+   hallucinated answer with a fabricated `sources` string and
+   `escalation_flag=false` passes `validate()` and would reach a student.
+   Source-whitelisting is deferred to the RAG milestone — fine — but it is a
+   live risk the moment `MODEL_PROVIDER=bedrock` serves real traffic. (The
+   malformed-JSON → safe-refusal fallback is good and is tested.)
+4. **[Cost/abuse] The HTTP API endpoint has no auth or throttling.** In a
+   budget-capped Learner Lab, an open POST endpoint is a cost/DoS risk. Consider
+   API Gateway throttling on deploys.
+5. **[Ops hygiene — minor] No explicit CloudWatch Log Group retention**, so the
+   Lambda's auto-created log group never expires (the 90-day commitment is
+   enforced on DynamoDB, not CloudWatch). Note: the handler does not write
+   question text to CloudWatch, so no PII lives there.
+6. **[Test coverage] The Bedrock `converse` network call and the `log_exchange`
+   DynamoDB write are not unit-tested** (only JSON parsing and env-gating are).
+   Acceptable for TM1; flagged.
+7. **[Not verified] devcontainer clean build, a real Learner Lab deploy, and
+   Bedrock availability** remain unverified.
+
+*Proposed disposition (the team decides):* fix #1 or explicitly scope it out in
+the narrative; #2 and #3 are accepted pilot limitations already consistent with
+IA2 but should be named; #4 and #5 are cheap hardening for the deploy step; #6
+and #7 are verification debt to close before final submission.
+
+**Human teammate sign-off (required by CONVENTIONS — a teammate who did NOT
+prompt the agent):** ________________________ (name, date). The reviewer should
+independently read the scaffold, run `make test`, and confirm the dispositions
+above.
 
 ---
 
@@ -102,24 +144,26 @@ does financial aid work at CMU?"` still returns the cited process answer with
 `escalation_flag=false`. NOT verified: devcontainer build, Learner Lab deploy,
 Bedrock path (unchanged by this entry).
 
-**What I contributed:** *(Team: fill in your own review here.)* The decision to
-bias the guard toward referral over precision, the noun-list scope, and the
-sign-off are the team's to own.
+**What I contributed:** Fan Yang directed this review pass, judged the
+personal-record slip-through worth fixing before submission, accepted the "bias
+toward referral over precision" tradeoff and its known limits (finite noun
+list, 30-char window), and chose to record the AI red-team findings in Entry 1
+for the team rather than act on them silently. *(Teammate: confirm and add your
+own notes.)*
 
 **Final answer submitted:** Working-tree changes to `escalation.py`,
 `test_handler.py`, `pyproject.toml`, `Makefile` (commit for TM1 submission).
 
-**Critic/Red Teamer review:** Reviewed by **Fan Yang, 2026-07-11.** Walked
-through the full diff line by line (the personal-record regex and its noun
-list, the check() call site, the pytest `pythonpath` and `PYTHONPATH=src`
+**Critic/Red Teamer review:** Author self-review by **Fan Yang, 2026-07-11** —
+walked through the full diff line by line (the personal-record regex and its
+noun list, the check() call site, the pytest `pythonpath` and `PYTHONPATH=src`
 changes); ran `make test` (22 passed); and probed the regex against 9 cases
-including over-escalation traps (e.g. "How does financial aid work?" and "My
-friend asked about the drop deadline") — all classified correctly. Known
-limits accepted: the noun list is finite (e.g. "my class schedule" is not
-caught) and the match window is 30 characters. *Honest caveat: this is a solo
-submission, so the reviewer is the same person who prompted the agent; the
-"independent teammate" standard in CONVENTIONS.md cannot be met here and is
-recorded rather than glossed.*
+including over-escalation traps ("How does financial aid work?", "My friend
+asked about the drop deadline") — all classified correctly. Known limits
+accepted: finite noun list (e.g. "my class schedule" is not caught) and a
+30-character match window. **Team project — independent sign-off still
+pending:** this is the author's own review; per CONVENTIONS.md a teammate who
+did not prompt the change should confirm and sign here: ________ (name, date).
 
 ---
 
