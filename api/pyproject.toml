@@ -23,3 +23,6 @@ ask_scotty = ["prompts/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Put the package on the path directly so `make test` works on a fresh clone
+# without requiring the editable install first ("clone and run").
+pythonpath = ["src"]
