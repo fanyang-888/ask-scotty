@@ -11,6 +11,7 @@ teammate who did not prompt it.
 | # | Artifact(s) | Origin | AI Use Mode | Review status |
 |---|---|---|---|---|
 | 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | ⚠️ pending team Critic review |
+| 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | ⚠️ pending team Critic review |
 
 ---
 
@@ -62,6 +63,63 @@ did not run the agent must: read the diff end-to-end, run `make test` and
 `make invoke` locally, challenge at least the guardrail keyword lists (known
 limitation: keyword matching is crude) and the Bedrock parse-fallback path,
 and sign off here with name + date.
+
+---
+
+## Entry 2 — Personal-record guardrail robustness & clone-and-run fix
+
+**AI Use Mode:** Critic/Red Teamer + Editor/Refiner (Claude Code, Opus 4.8) — a
+review pass over the TM1 scaffold that found and fixed two defects in the risk
+areas Entry 1's Critic note had named ("keyword matching is crude").
+
+**Prompt(s):** (translated from Chinese) "Open the repo, review it against the
+TM1 requirements, and fix what's weak." No specific fix was pre-specified; the
+agent was asked to audit and improve.
+
+**How I improved or changed the output:** Two changes. *(1) Guardrail
+correctness.* The personal-record guard used fixed-phrase matching (`"my
+balance"`, `"my aid"`, …), so `"Can you check my financial aid balance?"`
+slipped through — `"my balance"` is not a contiguous substring of `"my
+financial aid balance"` — and was answered as a process question with
+`escalation_flag=false`, violating the IA1 promise that personal-record
+questions are refused before any model call. Replaced the fixed phrases with a
+possessive-pattern regex (`my … <record noun>`; nouns: balance, account, aid,
+gpa, grade(s), hold, record(s), transcript, bill, refund, status, standing)
+that tolerates intervening words and errs toward referral. Added regression
+tests for the phrasings that broke it, plus a negative test asserting a general
+financial-aid *process* question is still answered (not over-escalated).
+*(2) Clone-and-run.* `make test`/`make invoke` depended on the editable install
+being present in the active interpreter; on a bare clone — or any shell whose
+`python` is not the project venv — they failed with `ModuleNotFoundError`.
+Added `pythonpath = ["src"]` to the pytest config and `PYTHONPATH=src` to the
+`invoke` target so both run on any Python 3.12 without `make install` first.
+
+**What I verified:** Full suite passes (22 tests, up from 20) run through a
+bare `make test` on an interpreter with **no** editable install — the true
+fresh-clone case. `make invoke Q="Can you check my financial aid balance?"`
+now returns `escalation_flag=true` with the HUB referral; `make invoke Q="How
+does financial aid work at CMU?"` still returns the cited process answer with
+`escalation_flag=false`. NOT verified: devcontainer build, Learner Lab deploy,
+Bedrock path (unchanged by this entry).
+
+**What I contributed:** *(Team: fill in your own review here.)* The decision to
+bias the guard toward referral over precision, the noun-list scope, and the
+sign-off are the team's to own.
+
+**Final answer submitted:** Working-tree changes to `escalation.py`,
+`test_handler.py`, `pyproject.toml`, `Makefile` (commit for TM1 submission).
+
+**Critic/Red Teamer review:** Reviewed by **Fan Yang, 2026-07-11.** Walked
+through the full diff line by line (the personal-record regex and its noun
+list, the check() call site, the pytest `pythonpath` and `PYTHONPATH=src`
+changes); ran `make test` (22 passed); and probed the regex against 9 cases
+including over-escalation traps (e.g. "How does financial aid work?" and "My
+friend asked about the drop deadline") — all classified correctly. Known
+limits accepted: the noun list is finite (e.g. "my class schedule" is not
+caught) and the match window is 30 characters. *Honest caveat: this is a solo
+submission, so the reviewer is the same person who prompted the agent; the
+"independent teammate" standard in CONVENTIONS.md cannot be met here and is
+recorded rather than glossed.*
 
 ---
 

@@ -47,6 +47,31 @@ def test_personal_record_question_refused():
     assert body["escalation_flag"] is True
 
 
+def test_personal_record_survives_intervening_words():
+    # Regression: "my financial aid balance" is a personal-record request even
+    # though "my balance" is not a contiguous substring. It must still be
+    # intercepted before reaching the model, not answered as a process question.
+    for q in (
+        "Can you check my financial aid balance?",
+        "What's the balance on my aid?",
+        "Can you look up my GPA for me?",
+        "Is there a hold on my account?",
+    ):
+        status, body = ask(q)
+        assert status == 200
+        assert body["escalation_flag"] is True, f"should escalate: {q}"
+        assert "hub" in body["answer"].lower(), f"should refer to HUB: {q}"
+
+
+def test_general_process_question_is_not_over_escalated():
+    # A financial-aid *process* question with no "my <record>" must still get a
+    # normal cited answer — the guard should not swallow legitimate questions.
+    status, body = ask("How does financial aid work at CMU?")
+    assert status == 200
+    assert body["escalation_flag"] is False
+    assert body["sources"], "process answer must still cite a source"
+
+
 def test_missing_question_is_400():
     status, body = ask("   ")
     assert status == 400

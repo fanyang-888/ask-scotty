@@ -7,6 +7,8 @@ output can cross them. Exclusions are enforced by structure, not by an
 accuracy target.
 """
 
+import re
+
 from ask_scotty.contract import AskResponse
 
 CRISIS_TERMS = (
@@ -29,15 +31,30 @@ IMMIGRATION_TERMS = (
     "sevis",
 )
 
-PERSONAL_RECORD_MARKERS = (
-    "my balance",
-    "my account",
-    "my aid",
-    "my financial aid status",
-    "my registration hold",
-    "my grades",
-    "my gpa",
-    "my record",
+# Personal-record requests are refused structurally. We match the possessive
+# pattern "my … <record noun>" rather than fixed phrases, so intervening words
+# can't defeat the guard: "my balance", "my financial aid balance", and "the
+# balance on my aid" all trip it. Erring toward referral is the product's
+# stated bias — better to hand a student to a person than to guess about a
+# record we cannot see.
+PERSONAL_RECORD_NOUNS = (
+    "balance",
+    "account",
+    "aid",
+    "gpa",
+    "grade",
+    "grades",
+    "hold",
+    "record",
+    "records",
+    "transcript",
+    "bill",
+    "refund",
+    "status",
+    "standing",
+)
+_PERSONAL_RECORD_RE = re.compile(
+    r"\bmy\b[\w' ]{0,30}?\b(?:" + "|".join(PERSONAL_RECORD_NOUNS) + r")\b"
 )
 
 CRISIS_RESPONSE = AskResponse(
@@ -84,6 +101,6 @@ def check(question: str) -> AskResponse | None:
         return CRISIS_RESPONSE
     if any(term in q for term in IMMIGRATION_TERMS):
         return IMMIGRATION_RESPONSE
-    if any(term in q for term in PERSONAL_RECORD_MARKERS):
+    if _PERSONAL_RECORD_RE.search(q):
         return PERSONAL_RECORD_RESPONSE
     return None

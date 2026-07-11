@@ -9,7 +9,7 @@ test:  ## full test suite
 	cd api && python -m pytest -q
 
 invoke:  ## run one question through the handler locally, no AWS/Docker needed
-	cd api && python -m ask_scotty.local "$(or $(Q),When is the last day to drop a course?)"
+	cd api && PYTHONPATH=src python -m ask_scotty.local "$(or $(Q),When is the last day to drop a course?)"
 
 run:  ## local HTTP API on :3000 (requires Docker for sam local)
 	sam local start-api --template infra/template.yaml --parameter-overrides LabRoleArn=arn:aws:iam::000000000000:role/local-dev
