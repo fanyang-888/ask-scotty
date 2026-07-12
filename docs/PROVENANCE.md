@@ -13,6 +13,7 @@ teammate who did not prompt it.
 | 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | AI red-team done; ⚠️ teammate sign-off pending |
 | 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | Author-reviewed; ⚠️ teammate sign-off pending |
 | 3 | Crisis-detection hardening, corpus-validated (escalation.py, tests) | Agent-generated, corpus-driven | Operator/Agent + Critic/Red Teamer | Corpus-validated; ⚠️ teammate sign-off pending |
+| 4 | Learner Lab deploy verification (no code changes — closes Entry 1's "deploy not verified" gap) | AI-operated, human-supervised | Operator/Agent | Verified against live endpoint; evidence below |
 
 ---
 
@@ -220,6 +221,43 @@ additions on branch `fy/entry1-critic-review`.
 **Human teammate sign-off pending:** ________ (name, date) — should run
 `make test`, read the pattern list for over/under-match, and confirm the
 residual-limit disposition.
+
+---
+
+## Entry 4 — Learner Lab deploy verification (2026-07-12)
+
+**AI Use Mode:** Operator/Agent (Claude Opus 4.8) — drove the browser to start
+the AWS Academy Learner Lab session and ran the deploy/verify/teardown cycle
+from the CLI. No application code changed in this entry. The human (Fan Yang)
+authorized the Vocareum terms acceptance and pasted the session credentials
+into `~/.aws/credentials` themselves — the agent never handled the secret
+values (a permission guardrail blocked credential extraction, correctly).
+
+**What was verified (closes Entry 1's "NOT yet verified: an actual Learner
+Lab deploy"):**
+- `sam deploy` of `infra/template.yaml` to the Learner Lab account
+  (us-east-1, stack `ask-scotty-dev`, LabRole as execution role):
+  **CREATE_COMPLETE** — Lambda + HTTP API + DynamoDB + S3 all provisioned as
+  declared, cost tags applied.
+- Live endpoint behavior, all four paths against the real API Gateway URL:
+  routine question → cited stub answer (`escalation_flag=false`); crisis
+  phrasing "I want to end it all" (an Entry 1 verified miss) → CaPS + 988
+  referral (`escalation_flag=true`); personal-record phrasing "check my
+  financial aid balance" (the Entry 2 bug) → HUB referral
+  (`escalation_flag=true`); blank question → HTTP 400.
+- **The env-gated DynamoDB logging path, which local tests never execute:**
+  3 exchange records written, correct `escalation_flag` per question,
+  `provider=stub`, and TTL = exactly 90 days (the IA1 retention line enforced
+  structurally). The 400 request correctly produced no log record.
+- Teardown: `sam delete` completed (per CONVENTIONS — delete stacks you're
+  done with). Budget impact: $0 of $50.
+
+**Still NOT verified:** devcontainer build on a clean machine; Bedrock model
+access in the Learner Lab account (deploy used `ModelProvider=stub`).
+
+**Critic/Red Teamer review:** the verification transcript IS the evidence;
+⚠️ teammate should spot-check by re-running the same cycle in their own lab
+session before TM1 submission if time allows.
 
 ---
 
