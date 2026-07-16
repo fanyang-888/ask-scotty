@@ -10,9 +10,9 @@ teammate who did not prompt it.
 
 | # | Artifact(s) | Origin | AI Use Mode | Review status |
 |---|---|---|---|---|
-| 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | AI red-team done; ⚠️ teammate sign-off pending |
-| 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | Author-reviewed; ⚠️ teammate sign-off pending |
-| 3 | Crisis-detection hardening, corpus-validated (escalation.py, tests) | Agent-generated, corpus-driven | Operator/Agent + Critic/Red Teamer | Corpus-validated; ⚠️ teammate sign-off pending |
+| 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | AI red-team done; Signed off (Siru Tao, 2026-07-16) |
+| 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | Author-reviewed; Signed off (Siru Tao, 2026-07-16) |
+| 3 | Crisis-detection hardening, corpus-validated (escalation.py, tests) | Agent-generated, corpus-driven | Operator/Agent + Critic/Red Teamer | Corpus-validated; Signed off (Siru Tao, 2026-07-16) |
 | 4 | Learner Lab deploy verification (no code changes — closes Entry 1's "deploy not verified" gap) | AI-operated, human-supervised | Operator/Agent | Verified against live endpoint; evidence below |
 
 ---
@@ -107,9 +107,9 @@ IA2 but should be named; #4 and #5 are cheap hardening for the deploy step; #6
 and #7 are verification debt to close before final submission.
 
 **Human teammate sign-off (required by CONVENTIONS — a teammate who did NOT
-prompt the agent):** ________________________ (name, date). The reviewer should
-independently read the scaffold, run `make test`, and confirm the dispositions
-above.
+prompt the agent):** Reviewed by **Siru Tao, 2026-07-16**. Ran `make test` (24
+passed), spot-checked `make invoke` on routine/crisis/personal-record
+questions, and confirmed the dispositions above.
 
 ---
 
@@ -153,8 +153,9 @@ Bedrock path (unchanged by this entry).
 personal-record slip-through worth fixing before submission, accepted the "bias
 toward referral over precision" tradeoff and its known limits (finite noun
 list, 30-char window), and chose to record the AI red-team findings in Entry 1
-for the team rather than act on them silently. *(Teammate: confirm and add your
-own notes.)*
+for the team rather than act on them silently. *Teammate confirmation (Siru
+Tao, 2026-07-16): reviewed the Entry 1 findings/dispositions and agree with the
+recorded handling and notes.*
 
 **Final answer submitted:** Working-tree changes to `escalation.py`,
 `test_handler.py`, `pyproject.toml`, `Makefile` (commit for TM1 submission).
@@ -166,9 +167,8 @@ changes); ran `make test` (22 passed); and probed the regex against 9 cases
 including over-escalation traps ("How does financial aid work?", "My friend
 asked about the drop deadline") — all classified correctly. Known limits
 accepted: finite noun list (e.g. "my class schedule" is not caught) and a
-30-character match window. **Team project — independent sign-off still
-pending:** this is the author's own review; per CONVENTIONS.md a teammate who
-did not prompt the change should confirm and sign here: ________ (name, date).
+30-character match window. **Team project — independent sign-off:** confirmed
+by **Siru Tao, 2026-07-16**.
 
 ---
 
@@ -212,15 +212,17 @@ disposition).
 **What I contributed:** Fan Yang decided to fix rather than merely document
 the finding, accepted the safety-over-precision bias (a rare jarring referral
 is preferred to a missed crisis), and accepted the residual limit above as a
-documented boundary of keyword-layer detection. *(Teammate: confirm.)*
+documented boundary of keyword-layer detection. *Teammate confirmation (Siru
+Tao, 2026-07-16): agree with the safety-over-precision stance and residual-limit
+recording.*
 
 **Final answer submitted:** escalation.py crisis-pattern rewrite + 2 test
 additions on branch `fy/entry1-critic-review`.
 
 **Critic/Red Teamer review:** Corpus validation above is the AI-side review.
-**Human teammate sign-off pending:** ________ (name, date) — should run
-`make test`, read the pattern list for over/under-match, and confirm the
-residual-limit disposition.
+**Human teammate sign-off:** **Siru Tao, 2026-07-16** — ran `make test`, read
+the pattern list for over/under-match, and confirmed the residual-limit
+disposition.
 
 ---
 
