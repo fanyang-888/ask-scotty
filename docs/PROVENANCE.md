@@ -10,8 +10,10 @@ teammate who did not prompt it.
 
 | # | Artifact(s) | Origin | AI Use Mode | Review status |
 |---|---|---|---|---|
-| 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | ⚠️ pending team Critic review |
-| 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | ⚠️ pending team Critic review |
+| 1 | Entire initial scaffold (devcontainer, api/, infra/, docs/, Makefile, conventions) | Agent-generated | Operator/Agent | AI red-team done; ⚠️ teammate sign-off pending |
+| 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | Author-reviewed; ⚠️ teammate sign-off pending |
+| 3 | Crisis-detection hardening, corpus-validated (escalation.py, tests) | Agent-generated, corpus-driven | Operator/Agent + Critic/Red Teamer | Corpus-validated; ⚠️ teammate sign-off pending |
+| 4 | Learner Lab deploy verification (no code changes — closes Entry 1's "deploy not verified" gap) | AI-operated, human-supervised | Operator/Agent | Verified against live endpoint; evidence below |
 
 ---
 
@@ -58,11 +60,56 @@ judgment stays with us.
 **Final answer submitted:** This repository at the commit tagged for TM1
 submission.
 
-**Critic/Red Teamer review:** ⚠️ Pending. Before submission a teammate who
-did not run the agent must: read the diff end-to-end, run `make test` and
-`make invoke` locally, challenge at least the guardrail keyword lists (known
-limitation: keyword matching is crude) and the Bedrock parse-fallback path,
-and sign off here with name + date.
+**Critic/Red Teamer review:**
+
+*AI red-team pass — Claude Opus 4.8, 2026-07-11.* An automated critique read the
+full scaffold (providers, handler, contract, guardrails, system prompt, SAM
+template, tests), ran the suite (22 pass), and probed the safety boundaries.
+This is an **input to** the human Critic review below, **not a substitute** for
+it. Findings:
+
+1. **[Safety — highest] Crisis detection is keyword-only and misses common
+   phrasings.** Verified: "I want to end it all" and "I can't go on anymore" are
+   NOT recognized and fall through to a generic refusal instead of the CaPS/988
+   response. Same brittleness class as the personal-record bug fixed in Entry 2,
+   but higher stakes. Recommend defense-in-depth (broader lexicon + a model-side
+   crisis check) before this is anything more than a pilot.
+   **→ FIXED in Entry 3** (pattern-based lexicon, corpus-validated 44/45 caught,
+   0/35 figurative false positives; one genuinely ambiguous phrasing recorded as
+   a residual limit — the model-side second layer remains future work).
+2. **[Privacy] The exchange log stores the raw `question` text.** IA2 itself
+   flags query text as sensitive; "anonymized" (no user id) is not "no PII"
+   (free text can contain names and situations). The 90-day TTL mitigates but
+   does not remove this. Recommend documenting it explicitly or scrubbing before
+   the write.
+3. **[Bedrock path] The contract validates structure, not groundedness.** A
+   hallucinated answer with a fabricated `sources` string and
+   `escalation_flag=false` passes `validate()` and would reach a student.
+   Source-whitelisting is deferred to the RAG milestone — fine — but it is a
+   live risk the moment `MODEL_PROVIDER=bedrock` serves real traffic. (The
+   malformed-JSON → safe-refusal fallback is good and is tested.)
+4. **[Cost/abuse] The HTTP API endpoint has no auth or throttling.** In a
+   budget-capped Learner Lab, an open POST endpoint is a cost/DoS risk. Consider
+   API Gateway throttling on deploys.
+5. **[Ops hygiene — minor] No explicit CloudWatch Log Group retention**, so the
+   Lambda's auto-created log group never expires (the 90-day commitment is
+   enforced on DynamoDB, not CloudWatch). Note: the handler does not write
+   question text to CloudWatch, so no PII lives there.
+6. **[Test coverage] The Bedrock `converse` network call and the `log_exchange`
+   DynamoDB write are not unit-tested** (only JSON parsing and env-gating are).
+   Acceptable for TM1; flagged.
+7. **[Not verified] devcontainer clean build, a real Learner Lab deploy, and
+   Bedrock availability** remain unverified.
+
+*Proposed disposition (the team decides):* fix #1 or explicitly scope it out in
+the narrative; #2 and #3 are accepted pilot limitations already consistent with
+IA2 but should be named; #4 and #5 are cheap hardening for the deploy step; #6
+and #7 are verification debt to close before final submission.
+
+**Human teammate sign-off (required by CONVENTIONS — a teammate who did NOT
+prompt the agent):** ________________________ (name, date). The reviewer should
+independently read the scaffold, run `make test`, and confirm the dispositions
+above.
 
 ---
 
@@ -102,24 +149,115 @@ does financial aid work at CMU?"` still returns the cited process answer with
 `escalation_flag=false`. NOT verified: devcontainer build, Learner Lab deploy,
 Bedrock path (unchanged by this entry).
 
-**What I contributed:** *(Team: fill in your own review here.)* The decision to
-bias the guard toward referral over precision, the noun-list scope, and the
-sign-off are the team's to own.
+**What I contributed:** Fan Yang directed this review pass, judged the
+personal-record slip-through worth fixing before submission, accepted the "bias
+toward referral over precision" tradeoff and its known limits (finite noun
+list, 30-char window), and chose to record the AI red-team findings in Entry 1
+for the team rather than act on them silently. *(Teammate: confirm and add your
+own notes.)*
 
 **Final answer submitted:** Working-tree changes to `escalation.py`,
 `test_handler.py`, `pyproject.toml`, `Makefile` (commit for TM1 submission).
 
-**Critic/Red Teamer review:** Reviewed by **Fan Yang, 2026-07-11.** Walked
-through the full diff line by line (the personal-record regex and its noun
-list, the check() call site, the pytest `pythonpath` and `PYTHONPATH=src`
+**Critic/Red Teamer review:** Author self-review by **Fan Yang, 2026-07-11** —
+walked through the full diff line by line (the personal-record regex and its
+noun list, the check() call site, the pytest `pythonpath` and `PYTHONPATH=src`
 changes); ran `make test` (22 passed); and probed the regex against 9 cases
-including over-escalation traps (e.g. "How does financial aid work?" and "My
-friend asked about the drop deadline") — all classified correctly. Known
-limits accepted: the noun list is finite (e.g. "my class schedule" is not
-caught) and the match window is 30 characters. *Honest caveat: this is a solo
-submission, so the reviewer is the same person who prompted the agent; the
-"independent teammate" standard in CONVENTIONS.md cannot be met here and is
-recorded rather than glossed.*
+including over-escalation traps ("How does financial aid work?", "My friend
+asked about the drop deadline") — all classified correctly. Known limits
+accepted: finite noun list (e.g. "my class schedule" is not caught) and a
+30-character match window. **Team project — independent sign-off still
+pending:** this is the author's own review; per CONVENTIONS.md a teammate who
+did not prompt the change should confirm and sign here: ________ (name, date).
+
+---
+
+## Entry 3 — Crisis-detection hardening (fixes Entry 1 finding #1)
+
+**AI Use Mode:** Operator/Agent + Critic/Red Teamer (Claude Opus 4.8) — the
+agent designed, implemented, and corpus-validated the fix for the highest-
+severity finding of the Entry 1 red-team pass.
+
+**Prompt(s):** (translated from Chinese) "Fix it" — referring to Entry 1
+finding #1 (crisis detection keyword-only, verified misses). Method was the
+agent's: two parallel corpus-generation agents produced (a) 45 realistic
+crisis phrasings a distressed student might type (paraphrase, slang,
+indirection, mixed with logistics requests) and (b) 35 benign student
+questions full of figurative death/harm idioms that must NOT trigger a 988
+referral ("this deadline is killing me", "academic suicide", "I shot myself
+in the foot", "I don't want to live in the dorms anymore"). The guard was then
+rewritten from 8 fixed substrings to ~28 compiled patterns and iterated
+against both corpora.
+
+**How I improved or changed the output:** The corpus exposed two defects in
+the agent's own first draft, which were fixed before commit: a lookahead
+missing a word boundary made "can't go on **a**nymore" match the article "a"
+and slip through; and "unalive" needed a suffix wildcard for "unaliving".
+Guards were added for figurative collisions the corpus surfaced ("academic/
+career/social suicide", "kms" as kilometres, "don't want to live **in the
+dorms**").
+
+**What I verified:** Corpus results: **44/45 crisis phrasings caught, 0/35
+benign false positives** (script in session scratchpad; corpora reproduced in
+the test suite's representative cases). End-to-end via `make invoke`: the two
+originally-missed phrasings now return the CaPS/988 response with
+`escalation_flag=true`. Full suite: **24 tests pass** (2 new: crisis
+paraphrases must be caught; figurative death language must not be). NOT
+achievable and recorded honestly: "How do I cancel my housing contract? Not
+that it matters, I don't plan on being here" is indistinguishable by keywords
+from a benign transfer-student question — this is the standing argument for a
+model-side crisis check as a second layer (future work, per Entry 1
+disposition).
+
+**What I contributed:** Fan Yang decided to fix rather than merely document
+the finding, accepted the safety-over-precision bias (a rare jarring referral
+is preferred to a missed crisis), and accepted the residual limit above as a
+documented boundary of keyword-layer detection. *(Teammate: confirm.)*
+
+**Final answer submitted:** escalation.py crisis-pattern rewrite + 2 test
+additions on branch `fy/entry1-critic-review`.
+
+**Critic/Red Teamer review:** Corpus validation above is the AI-side review.
+**Human teammate sign-off pending:** ________ (name, date) — should run
+`make test`, read the pattern list for over/under-match, and confirm the
+residual-limit disposition.
+
+---
+
+## Entry 4 — Learner Lab deploy verification (2026-07-12)
+
+**AI Use Mode:** Operator/Agent (Claude Opus 4.8) — drove the browser to start
+the AWS Academy Learner Lab session and ran the deploy/verify/teardown cycle
+from the CLI. No application code changed in this entry. The human (Fan Yang)
+authorized the Vocareum terms acceptance and pasted the session credentials
+into `~/.aws/credentials` themselves — the agent never handled the secret
+values (a permission guardrail blocked credential extraction, correctly).
+
+**What was verified (closes Entry 1's "NOT yet verified: an actual Learner
+Lab deploy"):**
+- `sam deploy` of `infra/template.yaml` to the Learner Lab account
+  (us-east-1, stack `ask-scotty-dev`, LabRole as execution role):
+  **CREATE_COMPLETE** — Lambda + HTTP API + DynamoDB + S3 all provisioned as
+  declared, cost tags applied.
+- Live endpoint behavior, all four paths against the real API Gateway URL:
+  routine question → cited stub answer (`escalation_flag=false`); crisis
+  phrasing "I want to end it all" (an Entry 1 verified miss) → CaPS + 988
+  referral (`escalation_flag=true`); personal-record phrasing "check my
+  financial aid balance" (the Entry 2 bug) → HUB referral
+  (`escalation_flag=true`); blank question → HTTP 400.
+- **The env-gated DynamoDB logging path, which local tests never execute:**
+  3 exchange records written, correct `escalation_flag` per question,
+  `provider=stub`, and TTL = exactly 90 days (the IA1 retention line enforced
+  structurally). The 400 request correctly produced no log record.
+- Teardown: `sam delete` completed (per CONVENTIONS — delete stacks you're
+  done with). Budget impact: $0 of $50.
+
+**Still NOT verified:** devcontainer build on a clean machine; Bedrock model
+access in the Learner Lab account (deploy used `ModelProvider=stub`).
+
+**Critic/Red Teamer review:** the verification transcript IS the evidence;
+⚠️ teammate should spot-check by re-running the same cycle in their own lab
+session before TM1 submission if time allows.
 
 ---
 

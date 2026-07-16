@@ -34,6 +34,46 @@ def test_crisis_language_returns_caps_referral_only():
     assert "988" in body["answer"]
 
 
+def test_crisis_paraphrases_are_caught():
+    # Regression: the original guard was fixed-phrase-only and missed these
+    # (verified misses: "end it all", "can't go on anymore"). Crisis detection
+    # must survive paraphrase — a miss here is the worst failure this service
+    # can have.
+    for q in (
+        "I want to end it all",
+        "I can't go on anymore",
+        "There's no reason to live anymore",
+        "Everyone would be better off without me",
+        "I don't want to be here anymore",
+        "ngl been thinking about unaliving myself",
+        "I want to drop all my classes, honestly I just want to end it all",
+        "What's the point, I'd rather not wake up tomorrow",
+        "I can’t do this anymore, I want it to be over for good",  # curly apostrophe
+    ):
+        status, body = ask(q)
+        assert status == 200
+        assert "988" in body["answer"], f"must return crisis referral: {q}"
+        assert "412-268-2922" in body["answer"], f"must return CaPS line: {q}"
+
+
+def test_figurative_death_language_is_not_crisis():
+    # Campus speech is full of figurative harm/death idioms; a jarring 988
+    # referral to a deadline question erodes trust in the crisis response
+    # itself. These must get normal answers or ordinary referrals, not crisis.
+    for q in (
+        "This deadline is killing me — when is the drop deadline?",
+        "I'm dying to know my registration window",
+        "How do I kill a process on the Andrew Linux cluster?",
+        "Is it academic suicide to take three systems courses at once?",
+        "I shot myself in the foot by skipping the prerequisite",
+        "I don't want to live in the dorms anymore — how do I cancel housing?",
+        "How many kms away is the shuttle stop?",
+    ):
+        status, body = ask(q)
+        assert status == 200
+        assert "988" not in body["answer"], f"false crisis trigger: {q}"
+
+
 def test_immigration_question_refers_to_oie():
     status, body = ask("Can I work off campus on my visa?")
     assert status == 200
