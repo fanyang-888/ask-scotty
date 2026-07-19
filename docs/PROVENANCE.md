@@ -14,6 +14,7 @@ teammate who did not prompt it.
 | 2 | Personal-record guardrail robustness + clone-and-run fix (escalation.py, tests, pyproject, Makefile) | AI-assisted | Critic/Red Teamer + Editor/Refiner | Author-reviewed; Signed off (Siru Tao, 2026-07-16) |
 | 3 | Crisis-detection hardening, corpus-validated (escalation.py, tests) | Agent-generated, corpus-driven | Operator/Agent + Critic/Red Teamer | Corpus-validated; Signed off (Siru Tao, 2026-07-16) |
 | 4 | Learner Lab deploy verification (no code changes — closes Entry 1's "deploy not verified" gap) | AI-operated, human-supervised | Operator/Agent | Verified against live endpoint; evidence below |
+| 5 | Independent red-team audit of merged `main` — 2 bugs found, no code change yet | AI-assisted audit | Critic/Red Teamer | Found by **Xin Xu**; both bugs independently re-verified; Xin Xu sign-off on writeup pending (offline) |
 
 ---
 
@@ -260,6 +261,69 @@ access in the Learner Lab account (deploy used `ModelProvider=stub`).
 **Critic/Red Teamer review:** the verification transcript IS the evidence;
 ⚠️ teammate should spot-check by re-running the same cycle in their own lab
 session before TM1 submission if time allows.
+
+---
+
+## Entry 5 — Independent red-team audit of merged `main` (found by Xin Xu)
+
+**AI Use Mode:** Critic/Red Teamer — **Xin Xu** ran an AI-assisted audit of the
+merged `main` (post Entries 1–4): his assistant cloned the repo, read all files,
+ran the suite (24 pass), and probed guardrail/handler behavior. This entry
+*records a review*; it changes no code. Its writeup used Editor/Refiner mode
+(Fan Yang, Claude Code) to transcribe Xin Xu's audit and independently re-run
+every repro before recording — findings were re-confirmed, not taken on trust.
+
+**Prompt(s):** Xin Xu directed his assistant to clone the repo and audit it
+against the TM1 requirements and the safety narrative. Xin Xu is traveling and
+offline; his findings are transcribed here on his behalf.
+
+**How I improved or changed the output:** No code changed. The audit's two
+"red" findings were **independently reproduced** by Fan Yang's agent (see below)
+rather than accepted on trust; the same audit's ~5 "yellow/green" suggestions
+are noted for the team but not acted on in this entry.
+
+**What I verified (independent re-confirmation of Xin Xu's two findings):**
+
+1. **[Safety/correctness] Immigration guardrail uses bare-substring matching →
+   false OIE routing.** `escalation.py` matches immigration with
+   `any(term in q for term in IMMIGRATION_TERMS)` where the list contains
+   `"opt"` and `"cpt"`, so any word *containing* them trips the guard.
+   Reproduced (all return the Office of International Education referral):
+   "What are my enrollment **opt**ions?", "Is the writing course **opt**ional?",
+   "How do I **opt** out of the meal plan?", "What are the best **opt**ions for
+   electives?". This is the *same* bare-substring brittleness Entry 2
+   (personal-record) and Entry 3 (crisis) already fixed twice — the third guard
+   (immigration) was left on `term in q`. Fix: word-boundary regex
+   (`\bopt\b`, `\bcpt\b`, …), mirroring Entries 2–3.
+2. **[Robustness] `answer_question()` exceptions are uncaught → HTTP 502 with no
+   contract.** `handler.py` wraps only `log_exchange` in try/except, not the
+   generation call. Reproduced: injecting a provider whose `complete()` raises
+   (simulating Bedrock throttling / timeout / AccessDenied) makes the exception
+   escape `lambda_handler` entirely → API Gateway 502, with no
+   `{answer, sources, confidence, escalation_flag}` and no referral. This
+   contradicts the architecture narrative's "a malformed model answer must never
+   reach a student," and it fires the moment `MODEL_PROVIDER=bedrock` serves real
+   traffic (the Bedrock `FALLBACK` covers JSON-parse failure, not call failure).
+   Fix: wrap generation in the handler and degrade any exception to a safe
+   referral.
+
+**What Xin Xu contributed:** The audit and both bugs are Xin Xu's discovery. He
+also flagged, for the team (recorded, not reproduced here): no CI running tests
+on PRs; no read/aggregation side for the pilot's DynamoDB metrics
+(no `make report`); no API Gateway throttling; no CloudWatch log-group
+retention; no input-length cap. He deliberately did **not** touch code, citing
+this repo's rule that agent-generated changes need a provenance entry plus an
+independent teammate sign-off.
+
+**Final answer submitted:** This entry records the audit only — no code change.
+Disposition (team decision): the two bugs are strong candidates for the TM2
+"Pipeline, Observability & Hardening" milestone, each landing with a regression
+test; fix earlier if TM1 is re-touched before final submission.
+
+**Critic/Red Teamer review:** The two findings were independently re-verified by
+Fan Yang's agent (repros re-run, 2026-07-19). ⚠️ **Xin Xu's own sign-off on this
+writeup is pending** — he is offline (traveling); this entry was transcribed on
+his behalf and should be confirmed by him on return.
 
 ---
 
